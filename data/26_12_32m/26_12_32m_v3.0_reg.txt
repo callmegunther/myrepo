@@ -1,0 +1,20 @@
+DEM Filename: /mnt/pgc/data/elev/dem/setsm/ArcticDEM/mosaic/2m_v3.1_tileqc/26_12/26_12_2m_reg_dem.mat
+Registration Dataset 1 Name: GLA14_rel634
+Statistics for Coregistration Cluster 1:
+# GCPs=866
+Mean Vertical Residual (m)=0.005
+Median Vertical Residual (m)=-0.062
+Translation Vector (dz,dx,dy)(m)= -0.430, -1.356, -0.312 
+Vertical Deviation Percentiles(m):
+50th percentile=0.664 
+55th percentile=0.741 
+60th percentile=0.819 
+65th percentile=0.919 
+70th percentile=1.035 
+75th percentile=1.171 
+80th percentile=1.366 
+85th percentile=1.579 
+90th percentile=2.142 
+95th percentile=3.286 
+100th percentile=12.605 
+

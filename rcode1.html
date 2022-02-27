@@ -344,7 +344,7 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">ArcticDEM - Geomorphometrical extraction of Eskers</h1>
-<h3 class="subtitle">Point Pattern Analysis</h3>
+<h3 class="subtitle">subtitle1</h3>
 <h4 class="author">Julian Stuber</h4>
 
 </div>
@@ -375,18 +375,19 @@ text-align: justify}
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>directory    <span class="ot">&lt;-</span> <span class="fu">getwd</span>()</span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>dataFolder   <span class="ot">&lt;-</span> <span class="fu">file.path</span>(directory, <span class="st">&quot;data&quot;</span>)</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>RFolder      <span class="ot">&lt;-</span> <span class="fu">file.path</span>(directory)</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Save plot/ map as .pdf to figures folder</span></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>saveFigure <span class="ot">&lt;-</span> <span class="cf">function</span>(plotname, filename){</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pdf</span>(<span class="fu">paste</span>(<span class="st">&quot;figures/&quot;</span>, filename, <span class="st">&quot;.pdf&quot;</span>, <span class="at">sep =</span> <span class="st">&quot;&quot;</span>))</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(plotname)</span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">dev.off</span>()</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">scipen=</span><span class="dv">6</span>)         <span class="co"># Display digits, not the scientific version</span></span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">digits.secs=</span><span class="dv">6</span>)    <span class="co"># Use milliseconds in Date/Time data types</span></span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">warning=</span><span class="cn">FALSE</span>)    <span class="co"># Don&#39;t show warnings</span></span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mfrow=</span><span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">1</span>))         <span class="co"># Reset plot placement to normal 1 by 1</span></span></code></pre></div>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>outputFolder <span class="ot">&lt;-</span> <span class="fu">file.path</span>(directory, <span class="st">&quot;output&quot;</span>)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Save plot/ map as .pdf to figures folder</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>saveFigure <span class="ot">&lt;-</span> <span class="cf">function</span>(plotname, filename){</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pdf</span>(<span class="fu">paste</span>(<span class="st">&quot;figures/&quot;</span>, filename, <span class="st">&quot;.pdf&quot;</span>, <span class="at">sep =</span> <span class="st">&quot;&quot;</span>))</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(plotname)</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">dev.off</span>()</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">scipen=</span><span class="dv">6</span>)         <span class="co"># Display digits, not the scientific version</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">digits.secs=</span><span class="dv">6</span>)    <span class="co"># Use milliseconds in Date/Time data types</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">warning=</span><span class="cn">FALSE</span>)    <span class="co"># Don&#39;t show warnings</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mfrow=</span><span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">1</span>))         <span class="co"># Reset plot placement to normal 1 by 1</span></span></code></pre></div>
 </div>
 <div id="libaries" class="section level2">
 <h2><em>Libaries</em></h2>
@@ -859,12 +860,16 @@ text-align: justify}
 ## attached base packages:
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
+## other attached packages:
+## [1] rgdal_1.5-27  raster_3.4-13 sp_1.4-5     
+## 
 ## loaded via a namespace (and not attached):
-##  [1] digest_0.6.28   R6_2.5.1        jsonlite_1.7.2  magrittr_2.0.1 
-##  [5] evaluate_0.14   rlang_0.4.11    stringi_1.7.5   jquerylib_0.1.4
-##  [9] bslib_0.3.1     rmarkdown_2.11  tools_4.1.1     stringr_1.4.0  
-## [13] xfun_0.26       yaml_2.2.1      fastmap_1.1.0   compiler_4.1.1 
-## [17] htmltools_0.5.2 knitr_1.36      sass_0.4.0</code></pre>
+##  [1] Rcpp_1.0.7       codetools_0.2-18 lattice_0.20-44  digest_0.6.28   
+##  [5] grid_4.1.1       R6_2.5.1         jsonlite_1.7.2   magrittr_2.0.1  
+##  [9] evaluate_0.14    rlang_0.4.11     stringi_1.7.5    jquerylib_0.1.4 
+## [13] bslib_0.3.1      rmarkdown_2.11   tools_4.1.1      stringr_1.4.0   
+## [17] xfun_0.26        yaml_2.2.1       fastmap_1.1.0    compiler_4.1.1  
+## [21] htmltools_0.5.2  knitr_1.36       sass_0.4.0</code></pre>
 </div>
 </div>
 
