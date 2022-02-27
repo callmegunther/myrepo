@@ -1,0 +1,678 @@
+---
+title: "ArcticDEM - Geomorphometrical extraction of Eskers"
+author: "Julian Stuber"
+subtitle: "Point Pattern Analysis"
+output: 
+  html_document:
+    code_folding: show
+    fig_caption: yes
+    highlight: tango
+    number_sections: no
+    theme: journal
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+
+# Info & Setup
+The focus of this data challenge will be on the methods for point pattern analysis introduced in Sessions 2 to 5, using a data set of crime incidents in several wards of the city center of York, UK.
+The following data sets are available for the assignment at hand:
+
+`York_crimes_2016-09.csv`: contains observed crimes in the city center of York.
+
+`York_gastronomy.shp`: containing bars, restaurants and pubs located in the city center of York, extracted from OpenStreetMap.
+
+`York_wards_city_center.shp`: contains the boundaries of the wards of the city center of York.
+
+`York_population_density.tif`, an interpolated rasterlayer of the population density of York
+
+Small annotation: Hopefully the internal links work. Sometimes they do and sometimes they do not. 
+
+## *Clean project, set options*
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+#rm(list=ls())             # Clean up the environment
+# To start with a clean slate, use the interactive "Session > Restart R" and
+# "Session > Clear Workspace ..." menu options in RStudio, rather than rm(list=ls())
+# For reasons why not to use rm(list=ls()), see here:
+# https://www.tidyverse.org/articles/2017/12/workflow-vs-script/
+
+# set directories
+directory    <- getwd()
+dataFolder   <- file.path(directory, "data")
+RFolder      <- file.path(directory)
+
+# Save plot/ map as .pdf to figures folder
+saveFigure <- function(plotname, filename){
+  pdf(paste("figures/", filename, ".pdf", sep = ""))
+  print(plotname)
+  dev.off()
+}
+
+options(scipen=6)         # Display digits, not the scientific version
+options(digits.secs=6)    # Use milliseconds in Date/Time data types
+options(warning=FALSE)    # Don't show warnings
+par(mfrow=c(1,1))         # Reset plot placement to normal 1 by 1
+```
+
+
+## *Libaries*
+Chunk checking for missing packages from existing list based on precedent lab sessions. 
+```{r include = FALSE}
+## Default repository
+local({r <- getOption("repos")
+       r["CRAN"] <- "http://cran.r-project.org" 
+       options(repos=r)
+})
+
+pkgTest <- function(x)
+  {
+    if (!require(x,character.only = TRUE))
+    {
+      install.packages(x,dep=TRUE)
+        if(!require(x,character.only = TRUE)) stop("Package not found")
+    }
+}
+
+# # From session 2
+# pkgTest("jsonlite")
+# pkgTest("leaflet")
+# pkgTest("RColorBrewer")
+# pkgTest("sp")
+# pkgTest("rgdal")
+# pkgTest("dbscan")
+# pkgTest("spatgraphs")
+# 
+# # From session 3
+# pkgTest("rgeos")
+# pkgTest("leaflet")
+# pkgTest("RColorBrewer")
+# pkgTest("sp")
+# pkgTest("tripack")
+# pkgTest("aspace")
+# 
+# # From session 4
+# pkgTest("ggplot2")
+# pkgTest("GISTools")
+# pkgTest("raster")
+# pkgTest("rasterVis")
+# pkgTest("rgdal")
+# pkgTest("spatstat")
+# 
+# # From session 5
+# pkgTest("rgdal")
+# pkgTest("GISTools")
+# pkgTest("spatstat")
+# pkgTest("spdep")
+# 
+# # Additional packages
+# pkgTest("grDevices")
+# pkgTest("fMultivar")
+# pkgTest("spatialEco")
+# pkgTest("lattice")
+```
+
+<!-- ## *CRS strings* -->
+<!-- ```{r, warning=FALSE, message=FALSE, fig.align="center"} -->
+<!-- # Projection strings for the Swiss LV03 CRS and WGS84 CRS, respectively -->
+<!-- CRS27700 = "+init=epsg:27700"   # British National Grid -->
+<!-- CRS4326 = "+init=epsg:4326"   # WGS84 Grid -->
+<!-- ``` -->
+
+<!-- *** -->
+<!-- # 1.Data exploration -->
+<!-- Questions to be answered / requirements to be met: -->
+
+<!-- - How many types of crimes exist? And what are these? Tabular and or visual presentation. -->
+
+<!-- - What are the five most frequently occurring types of crimes and what is their proportion (percent) of the total of crimes? <br> [take me there](#Overview) -->
+
+<!-- - A map view with at least two layers and appropriate symbolization, preferably with labeled coordinate axes. See a simple example in the assignment slides. <br> [take me there](#plots) -->
+
+
+<!-- ## <a id="cropping"></a>*Loading of data sets* -->
+<!-- ```{r, warning=FALSE, message=FALSE, fig.align="center"} -->
+<!-- # Load York_crimes_2016-09.csv -->
+<!-- crimes <- read.csv(file.path(dataFolder, "York_crimes_2016-09.csv"), sep = ",") -->
+<!-- # Create a SpatialPointsDataFrame -->
+<!-- coordinates(crimes) <- c("Longitude", "Latitude") -->
+<!-- proj4string(crimes) <- CRS4326 -->
+<!-- #plot(crimes) -->
+
+<!-- # Load York_gastronomy.shp -->
+<!-- #ogrInfo(dsn = dataFolder, layer = "York_gastronomy") -->
+<!-- gastronomy <- readOGR(dsn = dataFolder, layer = "York_gastronomy") -->
+
+<!-- # Assign CRS to dataset -->
+<!-- proj4string(gastronomy) <- CRS4326 -->
+<!-- #plot(gastronomy) -->
+
+<!-- # Load York_wards_city_center.shp -->
+<!-- #ogrInfo(dsn = dataFolder, layer = "York_wards_city_center") -->
+<!-- wards <- readOGR(dsn = dataFolder, layer = "York_wards_city_center", verbose = F) -->
+<!-- # Assign CRS to dataset -->
+<!-- proj4string(wards) <- CRS4326 -->
+<!-- #plot(wards) -->
+
+<!-- # Load York_population_density.tif -->
+<!-- pop <- raster("data/York_population_density.tif") -->
+<!-- proj4string(pop) <- CRS4326 -->
+<!-- #plot(pop) -->
+
+<!-- # Spatial subset of data for area of interest -->
+<!-- crimes <- crimes[wards, ] -->
+<!-- gastronomy <- gastronomy[wards, ] -->
+<!-- pop <- crop(pop, wards) -->
+
+<!-- # Transform datasets to British National Grid -->
+<!-- crimes_cartesian <- spTransform(crimes, CRS27700) -->
+<!-- gastronomy_cartesian <- spTransform(gastronomy, CRS27700) -->
+<!-- wards_cartesian <- spTransform(wards, CRS27700) -->
+<!-- pop_cartesian <- projectRaster(pop, crs = CRS27700) -->
+<!-- pop_cartesian <- crop(pop_cartesian, wards_cartesian) -->
+<!-- ``` -->
+
+<!-- ## <a id="Overview"></a>*Overview on data* -->
+<!-- ```{r} -->
+<!-- #brief look at structure and composition of York's crime scene. -->
+<!-- crimeOV <- as.data.frame(sort(table(crimes$Crime.type), decreasing = T)) -->
+<!-- colnames(crimeOV) <- c("Crimes", "Occurences") -->
+<!-- crimeOV -->
+
+<!-- #How many types of crimes exist? And what are these? -->
+<!-- n_crimes <- nrow(crimeOV) -->
+<!-- cat("The are", n_crimes, "recorded distinct crime types.") -->
+<!-- crimeOV$Crimes -->
+
+<!-- #What are the five most frequently occurring types of crimes and what is their proportion (percent) of the total of crimes? -->
+
+<!-- crimeOV["Percentage"] <- crimeOV$Occurences / sum(crimeOV$Occurences) * 100 -->
+<!-- head(crimeOV, n=5L) -->
+<!-- ``` -->
+
+<!-- ## <a id="plots"></a>*Initial plots for gastronomy and crimes, respectively, in the City of York, UK.* -->
+<!-- ```{r, warning=FALSE, message = F} -->
+<!-- # Before drawing gastro- / crime data on the canvas, we frist want get a feeling for the population distribution in the City of York. -->
+<!-- plot(pop_cartesian, main="Polulation Density in the City\n of York, UK", -->
+<!--      xlab = "x", ylab = "y") -->
+<!-- plot(wards_cartesian, add=T) -->
+
+
+<!-- # Plot (ggplot) of all castronomic facilities in the City of York -->
+<!-- plot_rest_york <- ggplot() + -->
+<!--   theme_classic() + -->
+<!--   ggtitle("Gastronomy in the City of York, UK") + -->
+<!--   theme(plot.title = element_text(hjust = 0.5))+ -->
+<!--   coord_fixed(ratio = 1) + -->
+<!--   xlab("x") + -->
+<!--   ylab("y") + -->
+<!--   geom_polygon(data = fortify(wards_cartesian), -->
+<!--                aes(x = long, y = lat, group = group), -->
+<!--                fill = "lightgray", col = "black", lwd = 0.25) + -->
+<!--   geom_point(data = as.data.frame(gastronomy_cartesian), -->
+<!--              aes(x = coords.x1, y = coords.x2, -->
+<!--                  colour = amenity), -->
+<!--              pch = 16, cex = 1) + -->
+<!--   labs(colour = "Gastro Type") + -->
+<!--   guides(fill = guide_legend(   #Why does this not work as intended? same problem with other geom_point commands -->
+<!--     title = "Gastronomy Types", -->
+<!--     title.position = "top", -->
+<!--     col = guide_legend(nrow = 8))) -->
+
+
+
+<!-- # We want to save the plot in our figure folder and display it right away, too. -->
+<!-- saveFigure(plot_rest_york, "plot_rest_york") -->
+
+<!-- plot_rest_york -->
+
+
+
+<!-- #THen, we initialise a plot for all crimes in York, with ggplot... -->
+<!-- plot_crimes_york <- ggplot() + -->
+<!--   theme_classic() + -->
+<!--   ggtitle("Crimes in the City of York, UK") + -->
+<!--   theme(plot.title = element_text(hjust = 0.5))+ -->
+<!--   coord_fixed(ratio = 1) + -->
+<!--   xlab("Latitude") + -->
+<!--   ylab("Longitude") + -->
+<!--   geom_polygon(data = fortify(wards_cartesian), -->
+<!--                aes(x = long, y = lat, group = group), -->
+<!--                fill = "lightgray", col = "black", lwd = 0.25) + -->
+<!--   geom_point(data = as.data.frame(crimes_cartesian), -->
+<!--              aes(x = Longitude, -->
+<!--                  y = Latitude, -->
+<!--                  colour = crimes_cartesian$Crime.type), -->
+<!--              pch = 16, cex = 1) + -->
+<!--   labs(colour = "Gastro Type") -->
+
+<!-- plot_crimes_york -->
+<!-- # We want to save the plot in our figure folder and display it right away, too. -->
+<!-- saveFigure(plot_crimes_york, "plot_crimes_york") -->
+
+
+<!-- #...and with leaflet javascript lib. -->
+<!-- # First, create the color palette -->
+<!-- pal_crimes <- colorFactor("Set1", crimes$Crime.type) -->
+<!-- pal_wards <- colorFactor("Dark2", wards$Name) -->
+
+<!-- # create content of the popup labels -->
+<!-- popup_crimes <- paste("<b>Type of Crime: </b>", crimes$Crime.type, "<br>", -->
+<!--                "<b>Location: </b>", crimes$Location, "<br>", -->
+<!--                "<b>Reported by: </b>", crimes$Reported.by) -->
+
+<!-- popup_wards <- paste("<b>Neighborhood: </b>", wards$Name) -->
+
+<!-- # Map visualization using Leaflet based on the data frame -->
+<!-- map_crime <- leaflet() %>% -->
+<!--   # Base groups -->
+<!--   addProviderTiles("Esri.WorldTopoMap", group = "Terrain") %>% -->
+<!--   addProviderTiles("Esri.WorldImagery", group = "Satellite") %>% -->
+<!--   addPolygons(data = wards, -->
+<!--               color = "black", -->
+<!--               weight = 1, -->
+<!--               smoothFactor = 0.5, -->
+<!--               fillColor = ~pal_wards(wards$Name), -->
+<!--               fillOpacity = 0.1, -->
+<!--               popup = popup_wards, -->
+<!--               group = "Wards") %>% -->
+<!--   addCircleMarkers(data = crimes, -->
+<!--                    color = ~pal_crimes(Crime.type), -->
+<!--                    stroke=F, -->
+<!--                    fillOpacity = 1, -->
+<!--                    radius = 4.0, -->
+<!--                    popup = popup_crimes, -->
+<!--                    group = "Crimes") %>% -->
+<!--   addLegend("bottomright", -->
+<!--             pal = pal_crimes, -->
+<!--             values = crimes$Crime.type, -->
+<!--             opacity = 1, -->
+<!--             title = "Type of Crimes") %>% -->
+<!--   # Layers control -->
+<!--   addLayersControl( -->
+<!--     baseGroups = c("Terrain","Satellite"), -->
+<!--     overlayGroups = c("Crimes"), -->
+<!--     options = layersControlOptions(collapsed = TRUE) -->
+<!--   ) -->
+
+<!-- map_crime -->
+<!-- ``` -->
+
+<!-- *** -->
+<!-- # 2.Patterns of spatial distribution of a point process -->
+<!-- Focus on the crime types “anti-social behaviour” and “burglary”. How could the pattern of spatial distribution of the occurrences of these two crime types be described? Are they rather evenly distributed or do you see clusters? Do you see local concentrations in certain areas? -->
+
+<!-- In order to jump straight to part where the questions above are being answered, [click here](#qanda). -->
+
+<!-- ## *Selecting crime types of interest, incl. visualisation* -->
+<!-- ```{r, warning=FALSE} -->
+<!-- #Firstly, subsets for the desired crime types "anti-social behaviour" and "burglary" are being created -->
+<!-- crime_antisocial <- crimes[crimes$Crime.type == "Anti-social behaviour", ] -->
+<!-- crime_burglary <- crimes[crimes$Crime.type == "Burglary", ] -->
+
+<!-- # Merge selected crime data -->
+<!-- crimes_sel <- rbind(crime_antisocial, crime_burglary) -->
+
+<!-- #Next up, we dispaly the two subsets of the data on a leaflet map -->
+<!-- # Prepare for map drawing using Leaflet -->
+<!-- # Creating color palette -->
+<!-- pal_crimes_sel <- colorFactor("Set1", crimes_sel$Crime.type) -->
+<!-- pal_ward <- colorFactor("Dark2", wards$Name) -->
+
+<!-- # create content of the popup labels (html is possible e.g. new lines with <br>) -->
+<!-- popup_crimes <- paste("<b>Type of Crime: </b>", crimes_sel$Crime.type, "<br>", -->
+<!--                "<b>Location: </b>", crimes_sel$Location, "<br>") -->
+
+<!-- popup_ward <- paste("<b>Neighborhood: </b>", wards$Name) -->
+
+<!-- # Map visualization using Leaflet based on the data frame -->
+<!-- map_crimes_sel <- leaflet() %>% -->
+<!--   # Base groups -->
+<!--   addProviderTiles("Esri.WorldTopoMap", group = "Terrain") %>% -->
+<!--   addProviderTiles("Esri.WorldImagery", group = "Satellite") %>% -->
+<!--   addPolygons(data = wards, -->
+<!--               color = "black", -->
+<!--               weight = 1, -->
+<!--               smoothFactor = 0.5, -->
+<!--               fillColor = ~pal_ward(wards$Name), -->
+<!--               fillOpacity = 0.1, -->
+<!--               popup = popup_ward, -->
+<!--               group = "Wards") %>% -->
+<!--   addCircleMarkers(data = crimes_sel, -->
+<!--                    color = ~pal_crimes_sel(Crime.type), -->
+<!--                    stroke = F, -->
+<!--                    fillOpacity = 1, -->
+<!--                    radius = 4.0, -->
+<!--                    popup = popup_crimes, -->
+<!--                    group = "Crimes") %>% -->
+<!--   addLegend("bottomright", -->
+<!--             pal = pal_crimes_sel, -->
+<!--             values = crimes_sel$Crime.type, -->
+<!--             opacity = 0.85, -->
+<!--             title = "Type of Crime") %>% -->
+<!--   # Layers control -->
+<!--   addLayersControl( -->
+<!--     baseGroups = c("Terrain","Satellite"), -->
+<!--     overlayGroups = c("Wards", "Crimes"), -->
+<!--     options = layersControlOptions(collapsed = TRUE) -->
+<!--   ) -->
+
+<!-- map_crimes_sel -->
+<!-- ``` -->
+
+<!-- ## *NNI* -->
+<!-- As learned in session 1, the nearest neighbour index gives a first idea on the occurence of clusters in point data. The `nnidist` measures the spatial distribution from 0 (clustered pattern) to 1 (randomly dispersed pattern) to regularly dispersed pattern. -->
+
+<!-- ```{r} -->
+<!-- #Nearest neighbor index (Clark & Evans 1954) -->
+<!-- crime_cart_anti <- crimes_cartesian[crimes_cartesian$Crime.type == "Anti-social behaviour", ] -->
+<!-- crime_cart_burg <- crimes_cartesian[crimes_cartesian$Crime.type == "Burglary", ] -->
+<!-- crimes_cart_sub <- rbind(crime_cart_anti, crime_cart_burg) -->
+
+
+<!-- nnd_crimes_anti <- nndist(coordinates(crime_cart_anti), k = 1) -->
+<!-- nnd_crimes_burg <- nndist(coordinates(crime_cart_burg), k = 1) -->
+
+
+<!-- #extract the bounding box and calculate the area -->
+<!-- area_crimes_anti <- (crime_cart_anti@bbox[1,2] - crime_cart_anti@bbox[1,1]) * (crime_cart_anti@bbox[2,2] - crime_cart_anti@bbox[2,1]) -->
+<!-- area_crimes_burg <- (crime_cart_burg@bbox[1,2] - crime_cart_burg@bbox[1,1]) * (crime_cart_burg@bbox[2,2] - crime_cart_burg@bbox[2,1]) -->
+
+
+<!-- #calculate the nearest neighbor index NNI from all the points -->
+<!-- NNI_crimes_anti <- mean(nnd_crimes_anti)/(1/(2*sqrt(nrow(crime_cart_anti)/area_crimes_anti))) -->
+
+<!-- NNI_crimes_burg <- mean(nnd_crimes_burg)/(1/(2*sqrt(nrow(crime_cart_burg)/area_crimes_burg))) -->
+<!-- cat("The NNI for anti-social behaviour in York is", NNI_crimes_anti,", whereas the NNI for burglary in York is", NNI_crimes_burg,".") -->
+<!-- ``` -->
+<!-- Judging from the derived NNI's, anti-social behaviour is more clustered (~0.3) than burglary (~0.85) occurences in the City of York. However, this phenomenon has to be investigated further. -->
+
+<!-- ## *DBScan* -->
+<!-- The `dbscan` algorithm helps us to find densitiy-based clusters. Key idea (lecture slides, session 2): "...for each point of a cluster the neighborhood of a given radius has to contain at least a minimum number of points..." -->
+
+<!-- ```{r} -->
+<!-- par(mfrow=c(1,2)) -->
+<!-- #Input parameters needed: (1)MinPoints and (2)Eps. -->
+<!-- #(1)MinPts is often chosen as dimensionality of the data +1 (ergo k = 3). -->
+<!-- kNNdistplot(coordinates(crime_cart_anti), k = 3) -->
+
+<!-- #(2)Find Eps using the knee in the kNN distance plot (ergo Eps ~) -->
+<!-- abline(h = 325, col="red") -->
+<!-- title("kNN-Plot for crime 'anti-social\n behaviour' in York, UK") -->
+
+<!-- #Finally, we run the `dbscan` on the subset of the data -->
+<!-- db_crime_anti <- dbscan::dbscan(coordinates(crime_cart_anti), eps = 325, minPts = 3) -->
+<!-- db_crime_anti -->
+
+<!-- #we do the same for 'burglary' -->
+<!-- kNNdistplot(coordinates(crime_cart_burg), k = 3) -->
+<!-- abline(h = 700, col="blue") -->
+<!-- title("kNN-Plot for crime 'burglary'\n in York, UK") -->
+<!-- db_crime_burg <- dbscan::dbscan(coordinates(crime_cart_burg), eps = 700, minPts = 3) -->
+<!-- db_crime_burg -->
+<!-- par(mfrow=c(1,1)) -->
+
+<!-- #to illustrate the clusters, a ggplot is is carried out for each crime of interest -->
+<!-- #Plottin of DBScan of crime type 'anti-social behaviour' in York -->
+<!-- plot_db_crime_anti <- ggplot() + -->
+<!--   theme_classic() + -->
+<!--   ggtitle("DBSCAN of Crimes in the City of York, UK: \nClusters of anti-social behaviour") + -->
+<!--   theme(plot.title = element_text(hjust = 0.5))+ -->
+<!--   coord_fixed(ratio = 1) + -->
+<!--   xlab("x") + -->
+<!--   ylab("y") + -->
+<!--   geom_polygon(data = fortify(wards_cartesian), -->
+<!--                aes(x = long, y = lat, group = group), -->
+<!--                fill = NA, col = "black", lwd = 0.45) + -->
+<!--   geom_point(data = as.data.frame(crime_cart_anti), -->
+<!--              aes(x = Longitude, y = Latitude), col = db_crime_anti$cluster + 1L, alpha = 1) -->
+<!-- plot_db_crime_anti -->
+
+<!-- #Plottin of DBScan of crime type 'burglary' in York -->
+<!-- plot_db_crime_burg <- ggplot() + -->
+<!--   theme_classic() + -->
+<!--   ggtitle("DBSCAN of Crimes in the City of York, UK: \nClusters of Burglary") + -->
+<!--   theme(plot.title = element_text(hjust = 0.5))+ -->
+<!--   coord_fixed(ratio = 1) + -->
+<!--   xlab("x") + -->
+<!--   ylab("y") + -->
+<!--   geom_polygon(data = fortify(wards_cartesian), -->
+<!--                aes(x = long, y = lat, group = group), -->
+<!--                fill = NA, col = "black", lwd = 0.45) + -->
+<!--   geom_point(data = as.data.frame(crime_cart_burg), -->
+<!--              aes(x = Longitude, y = Latitude), col = db_crime_burg$cluster + 1L, alpha = 1) -->
+<!-- plot_db_crime_burg -->
+
+<!-- # Save both plots as .pdf to figures folder -->
+<!-- saveFigure(plot_db_crime_anti, "plot_db_crime_anti") -->
+<!-- saveFigure(plot_db_crime_burg, "plot_db_crime_burg") -->
+<!-- ``` -->
+
+<!-- ## *Kernel Density Estimation* -->
+<!-- ```{r} -->
+<!-- # Set up reference bandwidth (REF) and raster plot function -->
+<!-- ref.bw <- function(spdf){ -->
+<!--   sigma_x <- sd(coordinates(spdf)[,1]) -->
+<!--   sigma_y <- sd(coordinates(spdf)[,2]) -->
+<!--   sigma <- 0.5 * (sigma_x + sigma_y) -->
+<!--   h <- sigma * nrow(spdf)^(-1/6) -->
+<!--   message("REF bw: ", round(h,2), ", number of samples: ", nrow(spdf)) -->
+<!--   return(h)} -->
+
+
+<!-- # Raster plot function (opt for wards in York, UK) -->
+<!-- plotR <- function(r, title){ -->
+<!--   levelplot(r, par.settings=BuRdTheme(), margin=FALSE, at=seq(-1.01*maxValue(abs(r)), 1.01*maxValue(abs(r)), len=100), -->
+<!--           main=title, xlab="x", ylab="y") + -->
+<!--   latticeExtra::layer(sp.lines(wards, col = "gray", lwd = 0.5, a=0.5)) -->
+<!-- } -->
+
+<!-- # Perform kernel density estimation for crime_anti and crime_burg -->
+<!-- # Bw selection -->
+<!-- bw_crime_anti <-ref.bw(crime_cart_anti) -->
+<!-- bw_crime_burg <-ref.bw(crime_cart_burg) -->
+
+<!-- # Kernel density estimation for crimes -->
+
+<!-- kde_crime_anti <- raster::mask(raster(kde.points(crime_cart_anti, -->
+<!--              h = bw_crime_anti, -->
+<!--              n = 500, -->
+<!--              lims=extent(wards_cartesian))), wards_cartesian) -->
+
+<!-- kde_crime_burglary <- raster::mask(raster(kde.points(crime_cart_burg, -->
+<!--              h = bw_crime_burg, -->
+<!--              n = 500, -->
+<!--              lims=extent(wards_cartesian))), wards_cartesian) -->
+
+<!-- # Plot -->
+<!-- plot_kde_crime_anti <- plotR(kde_crime_anti, -->
+<!--                                    title = "KDE of crimes in the City of York, UK:\nAnti-social behaviour") -->
+<!-- plot_kde_crime_burglary <- plotR(kde_crime_burglary, -->
+<!--                                    title = "KDE of crimes in the City of York, UK:\nBurglary") -->
+
+<!-- plot_kde_crime_anti -->
+<!-- plot_kde_crime_burglary -->
+
+<!-- # Save plot/ map as .pdf to figures folder -->
+<!-- saveFigure(plot_kde_crime_anti, "plot_kde_crime_anti") -->
+<!-- ## quartz_off_screen -->
+<!-- ##                 2 -->
+<!-- saveFigure(plot_kde_crime_burglary, "plot_kde_crime_burg") -->
+<!-- ``` -->
+
+<!-- ## *Local Outlier Factor* -->
+<!-- A related technique to detect outlier is LOF (Local Outlier Factor) -->
+<!-- ```{r} -->
+<!-- # One is normal and the larger the value the more it is an outlier. -->
+<!-- # k is the number of nearest neighbors to be found. -->
+<!-- lof_anti <- lof(coordinates(crime_cart_anti), k = 3) -->
+<!-- #length(lof_anti) #true -->
+<!-- lof_anti_rmInf <- lof_anti[lof_anti!=Inf] -->
+<!-- head(sort(lof_anti_rmInf, decreasing = T), n=20L) #if value > 1: outlier. not sure where the Inf values come from. Please check! length(lof_anti) == length(crime_cart_anti) returns TRUE -->
+
+<!-- lof_burglary <- lof(coordinates(crime_cart_burg), k = 3) -->
+<!-- #length(lof_burglary) #true -->
+<!-- head(sort(lof_burglary, decreasing = T), n=20L) -->
+
+<!-- plot(coordinates(crime_cart_anti), pch = ".", -->
+<!--      main = "Local Outlier Factor (k=3) for crime type\n 'anti-social behaviour' in the City of York", -->
+<!--      asp = 1) -->
+<!-- points(coordinates(crime_cart_anti), cex = (lof_anti-1)*3, pch = 1, col = "red") -->
+
+<!-- plot(coordinates(crime_cart_burg), pch = ".", -->
+<!--      main = "Local Outlier Factor (k=3) for crime type\n 'burglary' in the City of York", -->
+<!--      asp = 1) -->
+<!-- points(coordinates(crime_cart_anti), cex = (lof_burglary-1)*3, pch = 1, col = "blue") -->
+<!-- ``` -->
+
+
+<!-- ## *Hexagonal Binning* -->
+<!-- Hexagonal is chosen as a alternative and last method for task 2. -->
+<!-- ```{r} -->
+<!-- # Hexagonal binning -->
+<!-- hex_crimes_anti <-ggplot() + -->
+<!--   theme_classic() + -->
+<!--   ggtitle("HexBin of crimes in the City of York, UK: \nBins of anti-social behaviour") + -->
+<!--   theme(plot.title = element_text(hjust = 0.5))+ -->
+<!--   coord_fixed(ratio = 1) + -->
+<!--   xlab("x") + -->
+<!--   ylab("y") + -->
+<!--   geom_polygon(data = fortify(wards_cartesian), -->
+<!--                aes(x = long, y = lat, group = group), -->
+<!--                fill = NaN, col = "black", lwd = 0.25) + -->
+<!--   geom_hex(data = as.data.frame(crime_cart_anti), -->
+<!--            aes(x = Longitude, -->
+<!--                y = Latitude), alpha = 0.9) + -->
+<!--   guides(fill = guide_legend( -->
+<!--     title = "Counts", -->
+<!--     title.position = "top", -->
+<!--     col = guide_legend(nrow = 8))) -->
+
+<!-- hex_crimes_burglary <-ggplot() + -->
+<!--   theme_classic() + -->
+<!--   ggtitle("HexBin of crimes in the City of York, UK: \nBins of burglary") + -->
+<!--   theme(plot.title = element_text(hjust = 0.5))+ -->
+<!--   coord_fixed(ratio = 1) + -->
+<!--   xlab("x") + -->
+<!--   ylab("y") + -->
+<!--   geom_polygon(data = fortify(wards_cartesian), -->
+<!--                aes(x = long, y = lat, group = group), -->
+<!--                fill = NaN, col = "black", lwd = 0.25) + -->
+<!--   geom_hex(data = as.data.frame(crime_cart_burg), -->
+<!--            aes(x = Longitude, -->
+<!--                y = Latitude), alpha = 0.9) + -->
+<!--   guides(fill = guide_legend( -->
+<!--     title = "Counts", -->
+<!--     title.position = "top", -->
+<!--     col = guide_legend(nrow = 8))) -->
+
+<!-- hex_crimes_anti -->
+<!-- hex_crimes_burglary -->
+
+<!-- # Save plot/ map as .pdf to figures folder -->
+<!-- saveFigure(hex_crimes_anti, "hex_crimes_anti") -->
+<!-- saveFigure(hex_crimes_burglary, "hex_crimes_burglary") -->
+<!-- ``` -->
+
+<!-- Through the hexagonal shape of the bins edge effects get reduced (compared to the rectangular shapes of the KDE method). Compared to the KDEs, one can clearly see certain similarities. -->
+
+<!-- ## *Q & A*<a id="qanda"></a> -->
+<!-- - How could the pattern of spatial distribution of the occurrences of these two crime types be described? <br> In total I would say that there are clusters visible for both crime types, but more obviously ones for anti-social behaviour compared to reported burglary. Furthermore, anti-social behaviour prevails the region of the city center. For the anti-social crimes the DBSCAN is a good method, because it casted on a large dataset, but for the burglary crimes it is less good since there are not that many data entries. -->
+
+<!-- - Are they rather evenly distributed or do you see clusters? <br>I think it is safe to say that the anti-social behaviour is not evenly distributed, which can clearly be observed by the DBSCAN. The biggest cluster (red) is around the city center followed by some other smaller cluster in the western part of York. The burglary crimes stay in strong contrast to the social behavior ones. As the total number is far lower than the anti behavior social crimes and the distribution is tendable to be some kind of randomly distributed. If a small enough minimum points value is chosen some cluster forms and show a distribution around the city center. -->
+
+<!-- - Do you see local concentrations in certain areas? <br> Local concentrations can be onbserved, as anti-social behaviour emerges pre-dominantly in the city center and West-York. This is probably due to the distribution in pouplation around the town, following a "the-more-the-more" logic. On the other hand burglary in Yorks city centre has a higher NNI, which supports our idea of 'burglary' not being clustered as anti-social behaviour. -->
+
+<!-- *** -->
+<!-- # 3.Relationship between two spatial point processes -->
+
+<!-- For this last task, I would like to look into the relation between crimes of anti-social nature, occurence of gastronomy facility and population density. First I would like to perform a comparison between population and anti-social behaviour. -->
+
+<!-- As the data has already been cropped to the scope of the city centre (see chunk on [spatial subsets](#cropping)) for all variables of interest, we only need to resample the crime 'anti-social behavaiour' along with the population of York. -->
+<!-- Then, we will calculate the raster substraction of the crime minus population. -->
+
+<!-- ## *Raster Diff ASB vs Population Density* -->
+<!-- ```{r} -->
+<!-- # Resample KDE and population density -->
+<!-- kde_crime_anti_resampled <- resample(kde_crime_anti, pop_cartesian, method='bilinear') -->
+
+<!-- kde_crime_anti_resampled_s <- scale(kde_crime_anti_resampled, center=TRUE, scale=TRUE) -->
+<!-- pop_cartesian_s <- scale(pop_cartesian, center=TRUE, scale=TRUE) -->
+
+<!-- # Calculate difference raster -->
+<!-- raster_diff <- kde_crime_anti_resampled_s - pop_cartesian_s -->
+<!-- plot(kde_crime_anti, main="KDE for anti-social crimes committed\nin the City of York", xlab=("Long"), ylab=("Lat"), cex.main=0.75) #how to make the legend display properly? -->
+<!-- plot(pop_cartesian, main="Population in the City of York", xlab=("Long"), ylab=("Lat"), cex.main=0.75) -->
+<!-- plot(raster_diff, main="Raster substraction\nKDE(crime_antisocial) - population", xlab=("Long"), ylab=("Lat"), cex.main=0.75) -->
+<!-- ``` -->
+<!-- To critically assess the calculation steps above, I am not really sure if it is legitimate to make a raster substraction of these two data sets, or if another operation between the two sets would have been more meaningful. What is - again - safe to say is that there are more crimes related to anti-social behaviour in the city centre, BUT there is a significantly higher amount of anti social behavior crimes in contrast to the population density in the city centre. Perhaps this has to do with weekend behaviour of certain people. Unfortunately I can only guess, since I do not know about the definition of the crime 'anti-social behaviour', especially not in the UK. -->
+
+<!-- To better understand the relationship between the two datasets a Spearman rank-order correlation/Spearman’s Rho is performed to investigate if the two variables are tend to change together under the assumption of non-normally distributed variables. -->
+
+<!-- ## *Correlation of Crime and Population Density* -->
+<!-- ```{r, echo = T, results = 'hide'} -->
+<!-- # A comparison of the Pearson and Spearman correlation methods -->
+<!-- corr_spearman <- rasterCorrelation(kde_crime_anti_resampled, pop_cartesian, s=3, type="spearman") -->
+
+<!-- # Plot the correlation map -->
+<!-- plot(corr_spearman, main="Spearman Correlation \nAnti-social behaviour and Population", -->
+<!--      xlab = "x", -->
+<!--      ylab = "y") -->
+<!-- plot(wards_cartesian, add=T) -->
+
+<!-- summary(corr_spearman) -->
+
+<!-- # Crime anti per number of population -->
+<!-- crime_anti_pop <- kde_crime_anti_resampled/pop_cartesian*10000 -->
+
+<!-- # Plot -->
+<!-- plot(crime_anti_pop, main = "Anti-social behaviour and Population \n Crime per 10'000 citizens", -->
+<!--      xlab = "x", -->
+<!--      ylab = "y") -->
+<!-- plot(wards_cartesian, add = T) -->
+<!-- ``` -->
+
+<!-- Repeatedly, two hotspots emerge when occurences of anti-social behaviour is being normalized per 10'000 citizens. But I cannot make loads of sense of the arguably more important plot, which is the first SPearman Correlation plot. Here, the green 'hotspot' in the city centre does not show a clear correlation between the two phenomena. -->
+
+<!-- ## *Cross L of ASB vs Gastronomy* -->
+<!-- ```{r} -->
+<!-- # Join datasets crimes and gastronomy -->
+<!-- gastronomy_cartesian@data$Crime.type <- c("Gastronomy") -->
+<!-- points_crime_gastro <- bind(crime_cart_anti, gastronomy_cartesian) -->
+
+<!-- # Define marks for L Function -->
+<!-- window_wards <- as.owin(wards_cartesian) -->
+<!-- marks_crimes <- as.data.frame(points_crime_gastro$Crime.type) -->
+<!-- marks_crimes_ppp <- ppp(x = points_crime_gastro@coords[ ,1], -->
+<!--                         y = points_crime_gastro@coords[ ,2], -->
+<!--                         window = window_wards, -->
+<!--                         marks = marks_crimes, -->
+<!--                         unitname = c("metre","metres")) -->
+
+<!-- #  L Function with envelope -->
+<!-- crimes_clf <- Lcross(marks_crimes_ppp, i="Anti-social behaviour", -->
+<!--                      j="Gastronomy", correction="border") -->
+<!-- crimes_clf_env <- envelope(marks_crimes_ppp, fun=Lcross, i="Anti-social behaviour", -->
+<!--                            j="Gastronomy", nsim=100, correction="border") -->
+
+<!-- # Plot -->
+<!-- plot(crimes_clf_env, -->
+<!--      main="Cross L Function \n Anti-social behaviour and Gastronomy") -->
+<!-- abline(v = 500, col = "blue") -->
+<!-- abline(v = 600, col = "blue") -->
+<!-- ``` -->
+
+<!-- Here we can see that the cross L function displays higher observed values of anti-social behaviour compared to an expected value given under complete spatial randomness. The observed crime values are higher for distances smaller than approx. 500 and greater than 600 meters. This represents strong/significant clustering up to 500 and above less but still above 600 meter distance. -->
+
+<!-- ## Report on Difficulty -->
+<!-- The amount of workload surmounted the indicated 12 hours by roughly 100%:). I think I've spent 20 hours on the assignment, with some hours watching tutorials or reading about some functions. The hardest part was to choose the suitable algorithm and not lose track of what it actually does e.g. "What data structure does my data have and how am I allowed to use it fruther". And I am still struggling with leaflet maps, even though I like them a lot, every map feels like the first one. -->
+
+```{r}
+sessionInfo()
+```
