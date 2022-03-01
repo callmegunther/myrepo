@@ -1,0 +1,5 @@
+cd <file location>
+md wgetdown
+cd wgetdown
+
+wget -r -N -nH -np -R index.html* --cut-dirs=6 https://data.pgc.umn.edu/elev/dem/setsm/ArcticDEM/mosaic/v3.0/10m/25_13/
