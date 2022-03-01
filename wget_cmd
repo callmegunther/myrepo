@@ -1,0 +1,7 @@
+paste the following instructions line-by-line into your cmd window (windows only, sorry!). for the <...> please fill in your own project folder and download folder path. 
+For download:
+
+For decompression:
+cd <project folder>
+md data
+tar -xvzf <download folder> -C <project folder>\decompressed *.tif
